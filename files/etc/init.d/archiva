@@ -1,0 +1,68 @@
+#!/bin/sh
+### BEGIN INIT INFO
+# Provides:          archiva
+# Required-Start:    $local_fs $remote_fs $network $syslog $named
+# Required-Stop:     $local_fs $remote_fs $network $syslog $named
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# X-Interactive:     true
+# Short-Description: Start/stop archiva artifacs server
+### END INIT INFO
+
+set -e
+if [ -f /lib/lsb/init-functions ] ; then
+	. /lib/lsb/init-functions
+fi
+
+ARCHIVA_HOME="/opt/archiva"
+ARCHIVA_PID_FILE="$ARCHIVA_HOME/logs/archiva.pid"
+ARCHIVA_USER=archiva
+
+case $1 in
+	start)
+		if [ -f "$ARCHIVA_PID_FILE" ] && kill -0 `cat "$ARCHIVA_PID_FILE"` ; then 
+			log_daemon_msg 'Already running!' 'archiva'
+		else
+			log_daemon_msg 'Starting' 'archiva'
+			su $ARCHIVA_USER -c "$ARCHIVA_HOME/bin/archiva start"
+		fi
+		log_end_msg 0
+	;;
+	stop)
+		log_daemon_msg 'Stoping' 'archiva'
+                su $ARCHIVA_USER -c "$ARCHIVA_HOME/bin/archiva stop"
+		sleep 10
+                if [ -f "$ARCHIVA_PID_FILE" ] ; then
+			PID=`cat "$ARCHIVA_PID_FILE"`
+			if kill -0 $PID ; then
+	                        log_daemon_msg 'Still running with pid $PID... killing it' 'archiva'
+				kill -15 ?$PID
+				sleep 5
+				kill -9 $PID
+			else
+                        	log_daemon_msg 'Not running but pid file still exists... deleting it' 'archiva'
+			fi
+			rm "$ARCHIVA_PID_FILE"
+                fi
+		log_end_msg 0
+	;;
+	restart)
+		$0 stop
+		$0 start
+	;;
+	status)
+		if [ -f "$ARCHIVA_PID_FILE" ] ; then
+                        PID=`cat "$ARCHIVA_PID_FILE"`
+	                if kill -0 $PID; then
+	                        echo "Archiva is running (pid $PID)."
+        	                exit 0
+			fi
+		fi
+		echo "Archiva is NOT running."
+                exit 1
+	;;
+	*)
+		log_success_msg "Usage: /etc/init.d/archiva {start|stop|restart|status}"
+		exit 1
+	;;
+esac
